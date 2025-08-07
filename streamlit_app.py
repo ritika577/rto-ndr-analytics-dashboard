@@ -1,6 +1,7 @@
 from databricks import sql
 import pandas as pd
 import streamlit as st
+import time
 import altair as alt
 from dotenv import load_dotenv
 from datetime import datetime
@@ -12,7 +13,6 @@ load_dotenv()
 # ------------------------------
 st.set_page_config(
     page_title="📦 RTO / NDR Analytics Dashboard",
-    page_icon="📦",
     layout="wide"
 )
 
@@ -31,6 +31,7 @@ conn = sql.connect(
 df_daily_rto = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.summary_daily_rto", conn)
 df_ndr_by_courier = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.summary_ndr_by_courier", conn)
 df_delivery_time = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.summary_delivery_time", conn)
+df_top_couriers_by_pincodes = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.top_couriers_by_pincode", conn)
 
 conn.close()
 
@@ -55,11 +56,14 @@ else:
     # ------------------------------
     col1, col2, col3 = st.columns(3)
     with col1:
+        start_time = time.time()
         st.metric("📦 Total RTOs", df_daily_rto["rto_count"].sum())
     with col2:
+        start_time = time.time()
         st.metric("🚚 Avg NDR %", round(df_ndr_by_courier["ndr_percentage"].mean(), 2))
     with col3:
         st.metric("⏱️ Avg Delivery Time", round(df_delivery_time["avg_delivery_days"].mean(), 2))
+
     
     # ------------------------------
     # Top 3 Performing Courier Partners (Lowest NDR %)
@@ -105,6 +109,17 @@ else:
         height=350
     )
 
+    # Convert PySpark DataFrame to Pandas
+   # Best practice also we need to add duckdb in future 
+    # pdf = df_top_couriers_by_pincodes.toPandas()
+
+    # Optional: Add selectbox for filtering
+    selected_pincode = st.selectbox("Select Pincode", sorted(df_top_couriers_by_pincodes["pincode"].unique()))
+
+    filtered_df = df_top_couriers_by_pincodes[df_top_couriers_by_pincodes["pincode"] == selected_pincode]
+
+    st.dataframe(filtered_df)
+
     st.altair_chart(chart_ndr, use_container_width=True)
 
     # ------------------------------
@@ -138,3 +153,5 @@ else:
         st.markdown("📦 **Delivery Time Table**")
         df_delivery_time.sort_values("avg_delivery_days",ascending=False, inplace=True)
         st.dataframe(df_delivery_time)
+
+
