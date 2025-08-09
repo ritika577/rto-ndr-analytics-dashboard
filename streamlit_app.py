@@ -31,7 +31,7 @@ conn = sql.connect(
 df_daily_rto = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.summary_daily_rto", conn)
 df_ndr_by_courier = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.summary_ndr_by_courier", conn)
 df_delivery_time = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.summary_delivery_time", conn)
-df_top_couriers_by_pincodes = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.top_couriers_by_pincode", conn)
+df_top_couriers_by_pincodes = pd.read_sql("SELECT * FROM rto_ndr_analytics_db.top_couriers_by_pincode where pincode like ", conn)
 
 conn.close()
 
