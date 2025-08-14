@@ -12,7 +12,7 @@ from datetime import datetime
 from plotly.express.colors import sample_colorscale
 import os
 from itertools import islice, cycle
-# load_dotenv()
+load_dotenv()
 
 # ------------------------------
 # Streamlit Page Configuration
@@ -145,19 +145,25 @@ else:
     # st.caption("Enter a pincode to see the top courier partner and total orders.")
 
     selected_pincode = st.text_input(" ", placeholder="Enter pincode").strip()
+    if selected_pincode:
+        # Ensure pincode is numeric and has 6 digits
+        if not selected_pincode.isdigit():
+            st.error("Please enter a valid pincode.")
+        else:
+            # Convert to integer for SQL query
+            selected_pincode = int(selected_pincode)
 
-    st.markdown(f"**🔍 Search results for:** {selected_pincode if selected_pincode else '_(none yet)_'}")
-    df_top_couriers_by_pincodes = pd.read_sql(f"SELECT * FROM rto_ndr_analytics_db.top_couriers_by_pincode where pincode like '%{selected_pincode}%';" , conn)
+        st.markdown(f"**🔍 Search results for:** {selected_pincode if selected_pincode else '_(none yet)_'}")
+        df_top_couriers_by_pincodes = pd.read_sql(f"SELECT * FROM rto_ndr_analytics_db.top_couriers_by_pincode where pincode like '%{selected_pincode}%';" , conn)
 
-    filtered_df = df_top_couriers_by_pincodes[df_top_couriers_by_pincodes["pincode"] == selected_pincode]
-    filtered_df["Pincode"]=filtered_df["pincode"]
-    filtered_df.drop(columns=["pincode"], inplace=True)
-    filtered_df["Top Courier Partner"]= filtered_df["courier_partner"]
-    filtered_df.drop(columns=["courier_partner"], inplace=True)
-    filtered_df["Total Orders"]= filtered_df["total_orders"]
-    filtered_df.drop(columns=["total_orders"], inplace=True)
+        df_top_couriers_by_pincodes["Pincode"]=df_top_couriers_by_pincodes["pincode"]
+        df_top_couriers_by_pincodes.drop(columns=["pincode"], inplace=True)
+        df_top_couriers_by_pincodes["Top Courier Partner"]= df_top_couriers_by_pincodes["courier_partner"]
+        df_top_couriers_by_pincodes.drop(columns=["courier_partner"], inplace=True)
+        df_top_couriers_by_pincodes["Total Orders"]= df_top_couriers_by_pincodes["total_orders"]
+        df_top_couriers_by_pincodes.drop(columns=["total_orders"], inplace=True)
 
-    st.dataframe(filtered_df)
+        st.dataframe(df_top_couriers_by_pincodes)
 
     
 
