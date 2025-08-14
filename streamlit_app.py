@@ -46,7 +46,12 @@ high_attempt_count= df_high_attempts_impact["attempts"].count()
 
 
 per_row=3
-kpis=[("📦 Total RTOs", df_daily_rto["rto_count"].sum()),( "🚚 Avg NDR %", round(df_ndr_by_courier["ndr_percentage"].mean(), 2)), ("⏱️ Avg Delivery Time", round(df_delivery_time["avg_delivery_days"].mean(), 2)), ("High Attempt %", f"{round((high_attempt_count/df_main_table.iloc[0, 0])*100,2)}%"), ("Top Failure Reason", df_failure_reasons["failure_reason"].mode()[0])]
+kpis=[("📦 Total RTOs", df_daily_rto["rto_count"].sum()),
+      ( "🚚 Avg NDR %", round(df_ndr_by_courier["ndr_percentage"].mean(), 2)), 
+      ("⏱️ Avg Delivery Time", round(df_delivery_time["avg_delivery_days"].mean(), 2)),
+        ("High Attempt %", f"{round((high_attempt_count/df_main_table.iloc[0, 0])*100,2)}%"),
+          ("Top Failure Reason", df_failure_reasons["failure_reason"].mode()[0]),
+          ("Top Courier Partner",df_ndr_by_courier.sort_values("ndr_percentage").iloc[0]["courier_partner"])]
 
 
 # ---- optional tiny CSS polish ----
@@ -97,20 +102,21 @@ else:
 
     with st.container(border=True):
         st.markdown("### Ops & Quality")
-        render_kpis(kpis[3:], per_row=per_row) 
-    # # KPIs
-    # # ------------------------------
+        render_kpis(kpis[3:5], per_row=per_row) 
+    with st.container(border=True):
+        st.markdown("### 🏆 Top Performing Courier Partner (Lowest NDR%)")
+        render_kpis(kpis[5:], per_row=per_row)  # last 3 KPIs
     
     # ------------------------------
     # Top 3 Performing Courier Partners (Lowest NDR %)
     # ------------------------------
-    st.markdown("### 🏆 Top 3 Performing Courier Partners (Lowest NDR%)")
+    # st.markdown("### 🏆 Top 3 Performing Courier Partners (Lowest NDR%)")
     
-    top_couriers = df_ndr_by_courier.sort_values("ndr_percentage").head(3)
+    # top_couriers = df_ndr_by_courier.sort_values("ndr_percentage").head(3)
 
-    for idx, row in top_couriers.iterrows():
-        st.write(f" **{row['courier_partner']}** – {row['ndr_percentage']}% NDR")
-        st.markdown("---")
+    # for idx, row in top_couriers.iterrows():
+    #     st.write(f" **{row['courier_partner']}** – {row['ndr_percentage']}% NDR")
+    #     st.markdown("---")
 
     # ------------------------------
     # Daily RTO Trend Chart
@@ -236,17 +242,33 @@ action_map = {
 }
 
 # Map to actions
+# Colors you’ll reuse everywhere
+color_map = {
+    "RTO": "#E53935",     # red
+    "Cancel": "#FB8C00",  # amber
+    "Review": "#3949AB",  # indigo
+}
+
 df_impact_of_delivery_attempts["action"] = df_impact_of_delivery_attempts["failure_reason"].map(action_map).fillna("Review")
 # 3) Aggregate for donut
 df_donut = df_impact_of_delivery_attempts.groupby("action", as_index=False).size().rename(columns={"size": "count"})
+# print(df_donut)
+
+# Build donut
 fig = px.pie(
     df_donut,
     names="action",
     values="count",
-    hole=0.55,  # <- donut!
-    title="High-Attempt Orders — Recommended Action Split"
+    hole=0.62,
+    color="action",
+    color_discrete_map=color_map,
 )
-fig.update_traces(textposition="inside", textinfo="percent+label")
+# Labels inside: “Label %”
+fig.update_traces(
+    textposition="inside",
+    textinfo="label+percent",
+    sort=False,
+    pull=[0, 0.08, 0],  # slightly emphasize the first slice (RTO)
+    hovertemplate="<b>%{label}</b><br>Count: %{value:,}<br>Share: %{percent}<extra></extra>"
+)
 st.plotly_chart(fig, use_container_width=True)
-
-
