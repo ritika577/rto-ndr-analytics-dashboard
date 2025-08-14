@@ -3,12 +3,15 @@ import pandas as pd
 import streamlit as st
 import streamlit as st
 import pandas as pd
+import math
 import plotly.express as px
 import time
 import altair as alt
 from dotenv import load_dotenv
 from datetime import datetime
+from plotly.express.colors import sample_colorscale
 import os
+from itertools import islice, cycle
 load_dotenv()
 
 # ------------------------------
@@ -48,8 +51,8 @@ high_attempt_count= df_high_attempts_impact["attempts"].count()
 per_row=3
 kpis=[("📦 Total RTOs", df_daily_rto["rto_count"].sum()),
       ( "🚚 Avg NDR %", round(df_ndr_by_courier["ndr_percentage"].mean(), 2)), 
-      ("⏱️ Avg Delivery Time", round(df_delivery_time["avg_delivery_days"].mean(), 2)),
-        ("High Attempt %", f"{round((high_attempt_count/df_main_table.iloc[0, 0])*100,2)}%"),
+      ("⏱️ Avg Delivery Time (In Days)", round(df_delivery_time["avg_delivery_days"].mean(), 2)),
+        ("High Reattempt %", f"{round((high_attempt_count/df_main_table.iloc[0, 0])*100,2)}%"),
           ("Top Failure Reason", df_failure_reasons["failure_reason"].mode()[0]),
           ("Top Courier Partner",df_ndr_by_courier.sort_values("ndr_percentage").iloc[0]["courier_partner"])]
 
@@ -136,8 +139,14 @@ else:
 
         # Optional: Add selectbox for filtering
     # 🔎 Search UI
-    selected_pincode = st.text_input("Search", placeholder="pincode").strip()
-    st.text("🔍 Search results for: " + selected_pincode)
+    # --- Pincode Search ---
+    st.markdown("### 🔎Pincode Courier Stats")
+    # Optional one‑line description (remove if you don't want it)
+    # st.caption("Enter a pincode to see the top courier partner and total orders.")
+
+    selected_pincode = st.text_input(" ", placeholder="Enter pincode").strip()
+
+    st.markdown(f"**🔍 Search results for:** {selected_pincode if selected_pincode else '_(none yet)_'}")
     df_top_couriers_by_pincodes = pd.read_sql(f"SELECT * FROM rto_ndr_analytics_db.top_couriers_by_pincode where pincode like '%{selected_pincode}%';" , conn)
 
     filtered_df = df_top_couriers_by_pincodes[df_top_couriers_by_pincodes["pincode"] == selected_pincode]
@@ -209,66 +218,141 @@ else:
         df_delivery_time.sort_values("avg_delivery_days",ascending=False, inplace=True)
         st.dataframe(df_delivery_time)
 
+    df_courier_partner_failure_reasons["courier_partner"] = df_courier_partner_failure_reasons["courier_partner"].astype(str)
+    df_courier_partner_failure_reasons["failure_reason"] = df_courier_partner_failure_reasons["failure_reason"].astype(str)
+    df_courier_partner_failure_reasons["count"] = pd.to_numeric(df_courier_partner_failure_reasons["count"], errors="coerce").fillna(0)
+
+    # 2) Aggregate to one row per (courier, reason)
+    agg = (
+        df_courier_partner_failure_reasons.groupby(["courier_partner", "failure_reason"], as_index=False)["count"]
+        .sum()
+    )
+
+    # 3) Order couriers by total volume (optional but makes stacks feel right)
+    courier_order = (
+        agg.groupby("courier_partner")["count"].sum()
+        .sort_values(ascending=False).index.tolist()
+    )
     # stacked bar chart
+
+    # Single hue (indigo) with lightness ramp
+    palette_C = [
+        "#F2F5FB",  # NEW extra light
+        "#E3E8F6", "#CFD8EE", "#BAC8E6", "#A6B9DE", "#91A9D6",
+        "#7D99CE", "#688AC6", "#547ABE", "#3F6BB6", "#2B5BAE",
+        "#164CA6", "#0E3E8F", "#082F78",
+        "#061F52"   # NEW deepest
+        ]
+
+    reasons = df_courier_partner_failure_reasons["failure_reason"].unique().tolist()
+    # Use your existing reason_order list or derive it:
+    reason_order = (
+        df_courier_partner_failure_reasons.groupby("failure_reason", as_index=False)["count"]
+        .sum()
+        .sort_values("count", ascending=False)["failure_reason"]
+        .tolist()
+    )
+    palette = palette_C[:len(reason_order)]  # trim to number of reasons
+    color_map = dict(zip(reason_order, palette))
+    if len(reasons) > len(palette):
+        extended = list(islice(cycle(palette), len(reasons)))
+        color_map = dict(zip(reasons, extended))
+
     fig = px.bar(
         df_courier_partner_failure_reasons,
         x="courier_partner",
         y="count",
         color="failure_reason",
-        title="**High-Attempt Orders by Courier (Stacked)**",
+        title="High-Attempt Orders by Courier (Stacked)",
+        category_orders={"failure_reason": reason_order},
+        color_discrete_map=color_map,
         hover_data=["courier_partner", "failure_reason", "count"]
     )
-    fig.update_layout(barmode="stack", xaxis_title="Courier", yaxis_title="Orders")
+
+    fig.update_layout(
+        barmode="stack",
+        title_font=dict(size=26, family="Arial Black", color="white"),
+        legend_title_text="Failure Reason",
+        legend=dict(font=dict(color="white"), bgcolor="rgba(0,0,0,0)"),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(
+            title="Courier",
+            tickfont=dict(color="white"),
+            titlefont=dict(color="white"),
+            gridcolor="rgba(255,255,255,0.06)"
+        ),
+        yaxis=dict(
+            title="Orders",
+            tickfont=dict(color="white"),
+            titlefont=dict(color="white"),
+            gridcolor="rgba(255,255,255,0.10)"
+        ),
+        margin=dict(t=80, r=40, l=60, b=60)
+    )
+    fig.update_traces(marker_line_width=0.4, marker_line_color="rgba(0,0,0,0.25)")
     st.plotly_chart(fig, use_container_width=True)
 
 
+    action_map = {
+        "Address Not Found": "RTO",
+        "COD Refused": "Cancel",
+        "Customer Unavailable": "RTO",
+        "Delivery Rescheduled": "Review",
+        "Incorrect Address": "RTO",
+        "Contact Number Not Reachable": "Review",
+        "Customer Asked to Cancel": "Cancel",
+        "Building Locked": "RTO",
+        "Security Refused Entry": "RTO",
+        "Weather Delay": "Review",
+        "Vehicle Breakdown": "Review",
+        "Highway Closed": "Review",
+        "Customer Shifted": "RTO",
+        "Fake Order Suspected": "Cancel",
+        "Courier Partner Delay": "Review"
+    }
 
-action_map = {
-    "Address Not Found": "RTO",
-    "COD Refused": "Cancel",
-    "Customer Unavailable": "RTO",
-    "Delivery Rescheduled": "Review",
-    "Incorrect Address": "RTO",
-    "Contact Number Not Reachable": "Review",
-    "Customer Asked to Cancel": "Cancel",
-    "Building Locked": "RTO",
-    "Security Refused Entry": "RTO",
-    "Weather Delay": "Review",
-    "Vehicle Breakdown": "Review",
-    "Highway Closed": "Review",
-    "Customer Shifted": "RTO",
-    "Fake Order Suspected": "Cancel",
-    "Courier Partner Delay": "Review"
-}
+    # Map to actions
+    # Colors you’ll reuse everywhere
+    color_map = {
+        "RTO": "#E53935",     # red
+        "Cancel": "#FB8C00",  # amber
+        "Review": "#3949AB",  # indigo
+    }
+    df_clean = (
+        df_impact_of_delivery_attempts
+        .dropna(subset=["failure_reason"])
+        .assign(failure_reason=lambda d: d.failure_reason.str.strip())
+        .query("failure_reason != ''")
+        .copy()
+    )
+    df_clean["action"] = df_clean["failure_reason"].map(action_map).fillna("Review")
+    df_donut = (df_clean.groupby("action", as_index=False)
+                .size().rename(columns={"size": "count"})
+                .sort_values("action"))
 
-# Map to actions
-# Colors you’ll reuse everywhere
-color_map = {
-    "RTO": "#E53935",     # red
-    "Cancel": "#FB8C00",  # amber
-    "Review": "#3949AB",  # indigo
-}
+    total_orders = int(df_donut["count"].sum())
 
-df_impact_of_delivery_attempts["action"] = df_impact_of_delivery_attempts["failure_reason"].map(action_map).fillna("Review")
-# 3) Aggregate for donut
-df_donut = df_impact_of_delivery_attempts.groupby("action", as_index=False).size().rename(columns={"size": "count"})
-# print(df_donut)
 
-# Build donut
-fig = px.pie(
-    df_donut,
-    names="action",
-    values="count",
-    hole=0.62,
-    color="action",
-    color_discrete_map=color_map,
-)
-# Labels inside: “Label %”
-fig.update_traces(
-    textposition="inside",
-    textinfo="label+percent",
-    sort=False,
-    pull=[0, 0.08, 0],  # slightly emphasize the first slice (RTO)
-    hovertemplate="<b>%{label}</b><br>Count: %{value:,}<br>Share: %{percent}<extra></extra>"
-)
-st.plotly_chart(fig, use_container_width=True)
+
+    gradient_colors = sample_colorscale("RdBu", [i/(len(df_donut)-1 or 1) for i in range(len(df_donut))])
+
+    fig = px.pie(
+        df_donut,
+        names="action",
+        values="count",
+        hole=0.6,
+        color="action",
+        color_discrete_sequence=gradient_colors
+    )
+    fig.update_traces(textinfo="label+percent", textposition="inside", marker=dict(line=dict(width=0)))
+    fig.update_layout(
+        title="Order Actions Distribution",
+        title_font=dict(size=24, color="white"),
+        showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=60, b=20, l=20, r=20),
+        font=dict(color="white")
+    )
+    st.plotly_chart(fig, use_container_width=True)
