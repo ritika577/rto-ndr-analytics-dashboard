@@ -250,25 +250,82 @@ color_map = {
 }
 
 df_impact_of_delivery_attempts["action"] = df_impact_of_delivery_attempts["failure_reason"].map(action_map).fillna("Review")
+# ------------------------------
+# Enhanced Professional Donut Chart
+# ------------------------------
+st.subheader("📊 Impact of Delivery Attempts - Action Analysis")
+
 # 3) Aggregate for donut
 df_donut = df_impact_of_delivery_attempts.groupby("action", as_index=False).size().rename(columns={"size": "count"})
-# print(df_donut)
 
-# Build donut
+# Calculate total for center display
+total_count = df_donut["count"].sum()
+
+# Enhanced color scheme for professional appearance
+enhanced_color_map = {
+    "RTO": "#DC2626",      # Professional red
+    "Cancel": "#F59E0B",   # Professional amber/orange
+    "Review": "#2563EB",   # Professional blue
+}
+
+# Build enhanced donut chart
 fig = px.pie(
     df_donut,
     names="action",
     values="count",
-    hole=0.62,
+    hole=0.65,  # Slightly larger hole for better center text space
     color="action",
-    color_discrete_map=color_map,
+    color_discrete_map=enhanced_color_map,
 )
-# Labels inside: “Label %”
+
+# Enhanced styling with outside labels
 fig.update_traces(
-    textposition="inside",
-    textinfo="label+percent",
+    textposition="outside",
+    textinfo="label+value+percent",
+    textfont_size=12,
+    textfont_color="black",
     sort=False,
-    pull=[0, 0.08, 0],  # slightly emphasize the first slice (RTO)
-    hovertemplate="<b>%{label}</b><br>Count: %{value:,}<br>Share: %{percent}<extra></extra>"
+    pull=[0.05, 0.05, 0.05],  # Subtle separation for all slices
+    hovertemplate="<b>%{label}</b><br>" +
+                  "Count: <b>%{value:,}</b><br>" +
+                  "Percentage: <b>%{percent}</b><br>" +
+                  "<extra></extra>",
+    marker=dict(
+        line=dict(color='white', width=2)  # Clean white borders
+    )
 )
+
+# Add center title with total count
+fig.add_annotation(
+    text=f"<b>Total Orders</b><br><span style='font-size:24px'>{total_count:,}</span>",
+    x=0.5, y=0.5,
+    font_size=14,
+    font_color="black",
+    showarrow=False,
+    align="center"
+)
+
+# Enhanced layout for professional appearance
+fig.update_layout(
+    title={
+        'text': "Delivery Attempts Impact Distribution",
+        'x': 0.5,
+        'xanchor': 'center',
+        'font': {'size': 16, 'color': '#1f2937'}
+    },
+    showlegend=True,
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.2,
+        xanchor="center",
+        x=0.5,
+        font=dict(size=12)
+    ),
+    margin=dict(t=50, b=80, l=50, r=50),
+    height=500,
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)'
+)
+
 st.plotly_chart(fig, use_container_width=True)
