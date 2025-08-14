@@ -12,7 +12,7 @@ from datetime import datetime
 from plotly.express.colors import sample_colorscale
 import os
 from itertools import islice, cycle
-load_dotenv()
+# load_dotenv()
 
 # ------------------------------
 # Streamlit Page Configuration
