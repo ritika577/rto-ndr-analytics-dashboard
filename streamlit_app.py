@@ -28,9 +28,7 @@ st.set_page_config(
 
 
 conn = create_engine(
-    "databricks://"
-    f"token:{os.environ['ACCESS_TOKEN']}@{os.environ['SERVER_HOSTNAME']}"
-    f"?http_path={os.environ['HTTP_PATH']}"
+    f"databricks://token:{os.environ['ACCESS_TOKEN']}@{os.environ['SERVER_HOSTNAME']}?http_path={os.environ['HTTP_PATH']}"
 )
 
 # ------------------------------
