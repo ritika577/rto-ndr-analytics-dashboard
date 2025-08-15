@@ -267,7 +267,7 @@ else:
         x="courier_partner",
         y="count",
         color="failure_reason",
-        title="High-Attempt Orders by Courier (Stacked)",
+        title="Failure Count Of Courier Partners (Stacked)",
         category_orders={"failure_reason": reason_order},
         color_discrete_map=color_map,
         hover_data=["courier_partner", "failure_reason", "count"]
@@ -287,7 +287,7 @@ else:
             gridcolor="rgba(255,255,255,0.06)"
         ),
         yaxis=dict(
-            title="Orders",
+            title="Failure Count",
             tickfont=dict(color="white"),
             titlefont=dict(color="white"),
             gridcolor="rgba(255,255,255,0.10)"
