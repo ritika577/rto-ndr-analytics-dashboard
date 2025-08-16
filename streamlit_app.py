@@ -80,7 +80,7 @@ def render_kpis(items, per_row=3, title=None):
 # ------------------------------
 # Check for Empty Data
 # ------------------------------
-if df_daily_rto.empty or df_ndr_by_courier.empty or df_delivery_time.empty:
+if df_daily_rto.empty or df_ndr_by_courier.empty or df_delivery_time.empty or df_delivery_attempts_impact.empty or df_high_attempts_impact.empty or df_failure_reasons.empty or df_main_table.empty or df_courier_partner_failure_reasons.empty or df_impact_of_delivery_attempts.empty:
     st.error("🚨 One or more summary tables are empty. Please verify your data in Databricks.")
 
 else:
